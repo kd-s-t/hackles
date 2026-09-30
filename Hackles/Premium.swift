@@ -48,6 +48,7 @@ enum PremiumGate: Identifiable {
 }
 
 enum PremiumPayMethod: String, CaseIterable, Identifiable {
+  case applePay
   case qrph
   case paypal
   case splitsafe
@@ -56,14 +57,16 @@ enum PremiumPayMethod: String, CaseIterable, Identifiable {
 
   var label: String {
     switch self {
+    case .applePay: return "Apple Pay"
     case .qrph: return "QR Ph"
     case .paypal: return "PayPal"
     case .splitsafe: return "SplitSafe"
     }
   }
 
-  var assetName: String {
+  var assetName: String? {
     switch self {
+    case .applePay: return nil
     case .qrph: return "PayQRPh"
     case .paypal: return "PayPayPal"
     case .splitsafe: return "PaySplitSafe"
@@ -74,6 +77,8 @@ enum PremiumPayMethod: String, CaseIterable, Identifiable {
 
   var detail: String {
     switch self {
+    case .applePay:
+      return "Pay with Apple Pay on this iPhone."
     case .qrph:
       return "Scan with GCash, Maya, or any QR Ph wallet."
     case .paypal:
@@ -85,6 +90,7 @@ enum PremiumPayMethod: String, CaseIterable, Identifiable {
 
   var confirmTitle: String {
     switch self {
+    case .applePay: return "Pay with Apple Pay"
     case .qrph: return "Pay with QR Ph"
     case .paypal: return "Continue with PayPal"
     case .splitsafe: return "Continue with SplitSafe"
@@ -243,7 +249,7 @@ struct PremiumPaywallSheet: View {
         .textCase(.uppercase)
         .tracking(0.6)
 
-      Text("Select a method. QR Ph, PayPal, and SplitSafe open checkout right away.")
+      Text("Select a method. Apple Pay, QR Ph, PayPal, and SplitSafe open checkout right away.")
         .font(.system(size: 14))
         .foregroundStyle(Theme.mute)
 
@@ -253,7 +259,9 @@ struct PremiumPaywallSheet: View {
         }
       }
 
-      if selectedMethod == .qrph {
+      if selectedMethod == .applePay {
+        methodFootnote("Confirm with Face ID or Touch ID. Your Premium unlocks after Apple Pay completes.")
+      } else if selectedMethod == .qrph {
         methodFootnote("Scan the QR with any QR Ph wallet. Your Premium unlocks after payment confirms.")
       } else if selectedMethod == .paypal {
         methodFootnote("You’ll finish in PayPal, then return here with Premium unlocked.")
@@ -283,10 +291,7 @@ struct PremiumPaywallSheet: View {
     let comingSoon = method.isComingSoon
 
     let row = HStack(spacing: 10) {
-      Image(method.assetName)
-        .resizable()
-        .scaledToFit()
-        .frame(width: comingSoon ? 26 : 36, height: comingSoon ? 26 : 36)
+      payMethodLogo(method, size: comingSoon ? 26 : 36)
         .opacity(comingSoon ? 0.45 : 1)
         .accessibilityHidden(true)
 
@@ -375,6 +380,26 @@ struct PremiumPaywallSheet: View {
     }
   }
 
+  private func payMethodLogo(_ method: PremiumPayMethod, size: CGFloat) -> some View {
+    Group {
+      if method == .applePay {
+        ZStack {
+          RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
+            .fill(Color.black)
+          Image(systemName: "apple.logo")
+            .font(.system(size: size * 0.48, weight: .medium))
+            .foregroundStyle(.white)
+        }
+        .frame(width: size, height: size)
+      } else if let assetName = method.assetName {
+        Image(assetName)
+          .resizable()
+          .scaledToFit()
+          .frame(width: size, height: size)
+      }
+    }
+  }
+
   private func bullet(_ text: String) -> some View {
     HStack(spacing: 10) {
       Image(systemName: "checkmark.circle.fill")
@@ -392,7 +417,7 @@ struct PremiumPaywallSheet: View {
     statusMessage = nil
     defer { isPaying = false }
 
-    // Local unlock until PayMongo / PayPal / SplitSafe gateways are wired for Hackles.
+    // Local unlock until Apple Pay / PayMongo / PayPal / SplitSafe gateways are wired.
     try? await Task.sleep(nanoseconds: 700_000_000)
     auth.setPremium(true, context: context)
     statusMessage = "\(selectedMethod.label) payment confirmed. Premium is active."
